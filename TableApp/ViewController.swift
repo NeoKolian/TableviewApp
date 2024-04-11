@@ -9,16 +9,21 @@ import UIKit
 
 class ViewController: UIViewController {
 
-    var data: [Int] = Array(1...30)
-    
+    var data: [CellModel] = (1...30).map { CellModel(number: $0) }
+    var dataSource: UITableViewDiffableDataSource<Int, CellModel>!
+
     override func viewDidLoad() {
         super.viewDidLoad()
         setup()
     }
-    
+
     @objc func shuffle() {
-        data.shuffle()
-        tableView.reloadData()
+        var snapshot = dataSource.snapshot()
+        let shuffledData = data.shuffled()
+        snapshot.deleteAllItems()
+        snapshot.appendSections([0])
+        snapshot.appendItems(shuffledData)
+        dataSource.apply(snapshot, animatingDifferences: true)
     }
 
     var tableView: UITableView = {
@@ -41,8 +46,7 @@ private extension ViewController {
         tableView.layer.maskedCorners = [.layerMaxXMinYCorner, .layerMinXMinYCorner]
         
         tableView.delegate = self
-        tableView.dataSource = self
-        
+        configureDataSource()
 
         makeConstraints()
     }
@@ -56,34 +60,41 @@ private extension ViewController {
             tableView.bottomAnchor.constraint(equalToSystemSpacingBelow: view.bottomAnchor, multiplier: 0)
         ])
     }
+    
+    func configureDataSource() {
+        dataSource = UITableViewDiffableDataSource<Int, CellModel>(tableView: tableView, cellProvider: { tableView, indexPath, item in
+            let cell = tableView.dequeueReusableCell(withIdentifier: "\(TableViewCell.self)", for: indexPath) as! TableViewCell
+            cell.numberLabel.text = String(item.number)
+            return cell
+        })
+
+        var snapshot = NSDiffableDataSourceSnapshot<Int, CellModel>()
+        snapshot.appendSections([0])
+        snapshot.appendItems(data)
+        dataSource.apply(snapshot, animatingDifferences: true)
+    }
 }
 
 extension ViewController: UITableViewDelegate {
     func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
-        let cell: TableViewCell = tableView.cellForRow(at: indexPath) as! TableViewCell
+        guard let cell = tableView.cellForRow(at: indexPath) as? TableViewCell else { return }
         tableView.deselectRow(at: indexPath, animated: true)
         
-        if cell.isMaked != true {
-            UIView.transition(with: tableView, duration: 0.2, options: .transitionCrossDissolve, animations: { [weak self] in
-                self?.tableView.moveRow(at: indexPath, to: [0,0])
-            })
-            cell.isMaked.toggle()
+        if cell.isMarked != true {
+            guard let item = dataSource.itemIdentifier(for: indexPath) else { return }
+            var snapshot = dataSource.snapshot()
+            snapshot.moveItem(item, beforeItem: snapshot.itemIdentifiers[0])
+            dataSource.apply(snapshot, animatingDifferences: true)
+            cell.isMarked.toggle()
             cell.checkMarkImageView.isHidden.toggle()
         } else {
-            cell.isMaked.toggle()
+            cell.isMarked.toggle()
             cell.checkMarkImageView.isHidden.toggle()
         }
     }
 }
 
-extension ViewController: UITableViewDataSource {
-    func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        data.count
-    }
-    
-    func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
-        let cell = tableView.dequeueReusableCell(withIdentifier: "\(TableViewCell.self)", for: indexPath) as! TableViewCell
-        cell.numberLabel.text = String(data[indexPath.row])
-        return cell
-    }
+
+struct CellModel: Hashable {
+    let number: Int
 }

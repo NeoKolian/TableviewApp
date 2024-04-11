@@ -22,7 +22,7 @@ class TableViewCell: UITableViewCell {
         fatalError("init(coder:) has not been implemented")
     }
     
-    var isMaked: Bool = false
+    var isMarked: Bool = false
     
     var numberLabel: UILabel = {
         let label = UILabel()
